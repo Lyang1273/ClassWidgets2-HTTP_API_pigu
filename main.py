@@ -8,6 +8,9 @@ import os
 from urllib.parse import urlparse, parse_qs
 
 
+__SYSTEM_COMMAND__ = False
+
+
 class CustomHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         try:
@@ -41,7 +44,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                     'remaining_time': runtime.remaining_time,
                 }
                 for key, default in field_map.items():
-                    if fields_config.get(key, True):   # 默认启用
+                    if fields_config.get(key, True):  # 默认启用
                         response_data[key] = default
 
                 response = json.dumps(response_data, indent=2, ensure_ascii=False, default=str).encode('utf-8')
@@ -62,6 +65,46 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 }
                 # 调用统一发送函数
                 self._send_notification(data)
+                return
+
+            if path == "/system" and __SYSTEM_COMMAND__:
+                # 获取命令
+                query = dict(parse_qs(parsed.query))
+                command = query.get("command", ["help"])[0]
+
+                # 获取其他参数
+                args = []
+                for key, value in query.items():
+                    if key != "command":
+                        # 拼接参数
+                        if len(value) > 1:
+                            args.extend(value)
+                        else:
+                            args.append(value[0])
+
+                import subprocess
+
+                if args:
+                    full_command = f"{command} {' '.join(args)}"
+                else:
+                    full_command = command
+
+                # 执！行！
+                try:
+                    result = subprocess.check_output(full_command, shell=True, stderr=subprocess.STDOUT, timeout=30)
+                    output = result.decode('utf-8', errors='ignore')
+                except subprocess.CalledProcessError as e:
+                    output = e.output.decode('utf-8', errors='ignore')
+                except Exception as e:
+                    output = str(e)
+
+                # 返回结果
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(output.encode('utf-8'))
+                logger.info(f"执行命令: {full_command}")
                 return
 
             self._send_json_error(404, "Not Found")
