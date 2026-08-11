@@ -14,7 +14,6 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             path = parsed.path
 
-            # ---------- /runtime ----------
             if path == "/runtime":
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
@@ -25,7 +24,6 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 runtime = self.server.plugin_api.runtime
 
                 response_data = {}
-                # 使用映射表简化（可根据需要调整）
                 field_map = {
                     'current_time': runtime.current_time,
                     'current_day_of_week': runtime.current_day_of_week,
@@ -51,7 +49,6 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 logger.success("GET /runtime 请求成功")
                 return
 
-            # ---------- /notification 或 /notifi ----------
             if path in ("/notification", "/notifi"):
                 # 从查询参数获取数据（GET 兼容）
                 query = dict(parse_qs(parsed.query))
@@ -67,7 +64,6 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 self._send_notification(data)
                 return
 
-            # ---------- 其他路径 404 ----------
             self._send_json_error(404, "Not Found")
 
         except Exception as e:
@@ -163,7 +159,7 @@ class CustomTCPServer(socketserver.TCPServer):
 class Plugin(CW2Plugin):
     pid = "http.lyang1273"
     name = "HTTP API Plugin"
-    version = "0.1.0"
+    version = "0.1.1"
 
     def __init__(self, api: PluginAPI):
         super().__init__(api)
