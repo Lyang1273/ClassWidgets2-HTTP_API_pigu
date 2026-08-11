@@ -1,129 +1,151 @@
-from ClassWidgets.SDK import CW2Plugin, PluginAPI, NotificationLevel  # ✅ 新增导入
+from ClassWidgets.SDK import CW2Plugin, PluginAPI, NotificationLevel
 from loguru import logger
 import http.server
 import socketserver
 import json
 import threading
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+
 
 class CustomHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             parsed = urlparse(self.path)
-            if parsed.path != '/runtime':
-                self.send_response(404)
+            path = parsed.path
+
+            # ---------- /runtime ----------
+            if path == "/runtime":
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(b'{"error": "Not Found"}')
+
+                fields_config = self.server.plugin.config.get('fields', {})
+                runtime = self.server.plugin_api.runtime
+
+                response_data = {}
+                # 使用映射表简化（可根据需要调整）
+                field_map = {
+                    'current_time': runtime.current_time,
+                    'current_day_of_week': runtime.current_day_of_week,
+                    'current_week': runtime.current_week,
+                    'current_week_of_cycle': runtime.current_week_of_cycle,
+                    'time_offset': runtime.time_offset,
+                    'schedule_meta': runtime.schedule_meta,
+                    'current_day_entries': runtime.current_day_entries,
+                    'current_entry': runtime.current_entry,
+                    'current_subject': runtime.current_subject,
+                    'current_title': runtime.current_title,
+                    'next_entries': runtime.next_entries,
+                    'current_status': runtime.current_status,
+                    'progress': runtime.progress,
+                    'remaining_time': runtime.remaining_time,
+                }
+                for key, default in field_map.items():
+                    if fields_config.get(key, True):   # 默认启用
+                        response_data[key] = default
+
+                response = json.dumps(response_data, indent=2, ensure_ascii=False, default=str).encode('utf-8')
+                self.wfile.write(response)
+                logger.success("GET /runtime 请求成功")
                 return
 
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
+            # ---------- /notification 或 /notifi ----------
+            if path in ("/notification", "/notifi"):
+                # 从查询参数获取数据（GET 兼容）
+                query = dict(parse_qs(parsed.query))
+                # 解析参数（注意 parse_qs 返回列表，取最后一个值）
+                data = {
+                    'level': query.get('level', ['INFO'])[-1],
+                    'title': query.get('title', [''])[-1] or '来自 HTTP API 的通知',
+                    'message': query.get('message', [''])[-1],
+                    'duration': query.get('duration', ['5000'])[-1],
+                    'closable': query.get('closable', ['true'])[-1].lower() in ('true', '1', 'yes')
+                }
+                # 调用统一发送函数
+                self._send_notification(data)
+                return
 
-            fields_config = self.server.plugin.config.get('fields', {})
-            runtime = self.server.plugin_api.runtime
-
-            response_data = {}
-
-            if fields_config.get('current_time', True):
-                response_data['current_time'] = runtime.current_time
-            if fields_config.get('current_day_of_week', True):
-                response_data['current_day_of_week'] = runtime.current_day_of_week
-            if fields_config.get('current_week', True):
-                response_data['current_week'] = runtime.current_week
-            if fields_config.get('current_week_of_cycle', True):
-                response_data['current_week_of_cycle'] = runtime.current_week_of_cycle
-            if fields_config.get('time_offset', True):
-                response_data['time_offset'] = runtime.time_offset
-            if fields_config.get('schedule_meta', True):
-                response_data['schedule_meta'] = runtime.schedule_meta
-            if fields_config.get('current_day_entries', True):
-                response_data['current_day_entries'] = runtime.current_day_entries
-            if fields_config.get('current_entry', True):
-                response_data['current_entry'] = runtime.current_entry
-            if fields_config.get('current_subject', True):
-                response_data['current_subject'] = runtime.current_subject
-            if fields_config.get('current_title', True):
-                response_data['current_title'] = runtime.current_title
-            if fields_config.get('next_entries', True):
-                response_data['next_entries'] = runtime.next_entries
-            if fields_config.get('current_status', True):
-                response_data['current_status'] = runtime.current_status
-            if fields_config.get('progress', True):
-                response_data['progress'] = runtime.progress
-            if fields_config.get('remaining_time', True):
-                response_data['remaining_time'] = runtime.remaining_time
-
-            response = json.dumps(response_data, indent=2, ensure_ascii=False, default=str).encode('utf-8')
-            self.wfile.write(response)
-            logger.success(f"GET /runtime 请求成功")
+            # ---------- 其他路径 404 ----------
+            self._send_json_error(404, "Not Found")
 
         except Exception as e:
-            logger.error(f"请求失败：{e}")
-            self.send_error(500, f"网络服务器错误：{e}")
+            logger.error(f"GET 请求失败: {e}")
+            self._send_json_error(500, "内部服务器错误")
 
     def do_POST(self):
-        """处理 POST 请求，用于发送通知"""
         try:
-            # 处理 /notification 或 /notifi
-            if self.path not in ('/notification', '/notifi'):
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b'{"error": "Not Found"}')
+            path = self.path
+            if path not in ("/notification", "/notifi"):
+                self._send_json_error(404, "Not Found")
                 return
 
-            # 读取请求体
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
-
-            # 获取必要参数且提供默认值
-            level_str = data.get('level', 'INFO').upper()
-            level_map = {
-                'INFO': NotificationLevel.INFO,
-                'ANNOUNCEMENT': NotificationLevel.ANNOUNCEMENT,
-                'WARNING': NotificationLevel.WARNING,
-                'SYSTEM': NotificationLevel.SYSTEM,
-            }
-            level = level_map.get(level_str, NotificationLevel.INFO)
-
-            title = data.get('title', '来自 HTTP API 的通知')
-            message = data.get('message', '')
-            duration = data.get('duration', 5000)
-            closable = data.get('closable', True)
-
-            # 获取提供者并发送通知
-            provider = self.server.plugin.notification_provider
-            provider.push(
-                level=level,
-                title=title,
-                message=message,
-                duration=duration,
-                closable=closable
-            )
-
-
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            response = json.dumps({'status': 'success', 'message': '通知已发送'}, ensure_ascii=False)
-            self.wfile.write(response.encode('utf-8'))
-            logger.success(f"通知发送成功: {title} - {message}")
+            self._send_notification(data)
 
         except json.JSONDecodeError:
-            self.send_error(400, "无效的 JSON 格式")
+            self._send_json_error(400, "无效的 JSON 格式")
         except Exception as e:
-            logger.error(f"POST 请求处理失败: {e}")
-            self.send_error(500, f"服务器内部错误: {e}")
-            provider = self.server.plugin.notification_provider
-            provider.push(
-                level="WARNING",
-                title="HTTP API 警告",
-                message=e
-            )
+            logger.error(f"POST 请求失败: {e}")
+            self._send_json_error(500, "内部服务器错误")
+
+    def _send_notification(self, data):
+        """统一发送通知，data 可为字典（来自 GET 查询或 POST JSON）"""
+        # 解析 level
+        level_str = data.get('level', 'INFO').upper()
+        level_map = {
+            'INFO': NotificationLevel.INFO,
+            'ANNOUNCEMENT': NotificationLevel.ANNOUNCEMENT,
+            'WARNING': NotificationLevel.WARNING,
+            'SYSTEM': NotificationLevel.SYSTEM,
+        }
+        level = level_map.get(level_str, NotificationLevel.INFO)
+
+        title = data.get('title', '来自 HTTP API 的通知')
+        message = data.get('message', '')
+        # 确保类型正确
+        try:
+            duration = int(data.get('duration', 5000))
+        except (ValueError, TypeError):
+            duration = 5000
+        closable = bool(data.get('closable', True))
+
+        provider = self.server.plugin.notification_provider
+        provider.push(
+            level=level,
+            title=title,
+            message=message,
+            duration=duration,
+            closable=closable
+        )
+
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        resp = json.dumps({'status': 'success', 'message': '通知已发送'}, ensure_ascii=False)
+        self.wfile.write(resp.encode('utf-8'))
+        logger.success(f"通知发送成功: {title} - {message}")
+
+    def _send_json_error(self, code, message):
+        """发送 JSON 格式错误响应"""
+        self.send_response(code)
+        self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        error_body = json.dumps({'error': message}, ensure_ascii=False)
+        self.wfile.write(error_body.encode('utf-8'))
+
+    def do_OPTIONS(self):
+        """处理 OPTIONS 预检请求，允许跨域"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def log_message(self, format, *args):
         logger.debug(f"{self.address_string()} - {format % args}")
