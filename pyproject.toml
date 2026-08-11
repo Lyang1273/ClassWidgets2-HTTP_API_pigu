@@ -1,0 +1,17 @@
+[project]
+name = "lyang-lyang1273"
+version = "1.0.0"
+description = "A Class Widgets plugin."
+authors = [
+    {name = "Lyang1273"},
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["class-widgets-sdk"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = {find = {exclude = ["qml", "assets", "tests", "docs"]}}

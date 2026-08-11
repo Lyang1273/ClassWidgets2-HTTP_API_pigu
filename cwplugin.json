@@ -1,0 +1,12 @@
+{
+  "id": "http.lyang1273",
+  "name": "HTTP API",
+  "version": "0.0.0",
+  "api_version": ">=0.4.1",
+  "entry": "main.py",
+  "author": "Lyang1273",
+  "description": "通过HTTP请求获取西大不丢的运行时数据",
+  "url": "-",
+  "readme": "README.md",
+  "icon": "icon.png"
+}
