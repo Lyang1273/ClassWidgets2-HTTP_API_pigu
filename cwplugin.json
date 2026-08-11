@@ -2,10 +2,10 @@
   "id": "http.lyang1273",
   "name": "HTTP API",
   "version": "0.1.0",
-  "api_version": ">=0.4.1",
+  "api_version": ">=0.4.0",
   "entry": "main.py",
   "author": "Lyang1273",
-  "description": "通过HTTP请求获取西大不丢的运行时数据",
+  "description": "通过 HTTP API 使用 Class Widgets SDK 的 API 接口，此插件功能仍在完善。",
   "url": "https://github.com/Lyang1273/ClassWidgets2-HTTP_API_pigu",
   "readme": "README.md",
   "icon": "icon.png"

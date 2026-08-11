@@ -1,15 +1,22 @@
-from ClassWidgets.SDK import CW2Plugin, PluginAPI
+from ClassWidgets.SDK import CW2Plugin, PluginAPI, NotificationLevel  # ✅ 新增导入
 from loguru import logger
 import http.server
 import socketserver
 import json
 import threading
 import os
-
+from urllib.parse import urlparse
 
 class CustomHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         try:
+            parsed = urlparse(self.path)
+            if parsed.path != '/runtime':
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b'{"error": "Not Found"}')
+                return
+
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -51,11 +58,72 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
 
             response = json.dumps(response_data, indent=2, ensure_ascii=False, default=str).encode('utf-8')
             self.wfile.write(response)
-            logger.success(f"Get请求成功")
+            logger.success(f"GET /runtime 请求成功")
 
         except Exception as e:
             logger.error(f"请求失败：{e}")
             self.send_error(500, f"网络服务器错误：{e}")
+
+    def do_POST(self):
+        """处理 POST 请求，用于发送通知"""
+        try:
+            # 处理 /notification 或 /notifi
+            if self.path not in ('/notification', '/notifi'):
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b'{"error": "Not Found"}')
+                return
+
+            # 读取请求体
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+
+            # 获取必要参数且提供默认值
+            level_str = data.get('level', 'INFO').upper()
+            level_map = {
+                'INFO': NotificationLevel.INFO,
+                'ANNOUNCEMENT': NotificationLevel.ANNOUNCEMENT,
+                'WARNING': NotificationLevel.WARNING,
+                'SYSTEM': NotificationLevel.SYSTEM,
+            }
+            level = level_map.get(level_str, NotificationLevel.INFO)
+
+            title = data.get('title', '来自 HTTP API 的通知')
+            message = data.get('message', '')
+            duration = data.get('duration', 5000)
+            closable = data.get('closable', True)
+
+            # 获取提供者并发送通知
+            provider = self.server.plugin.notification_provider
+            provider.push(
+                level=level,
+                title=title,
+                message=message,
+                duration=duration,
+                closable=closable
+            )
+
+
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            response = json.dumps({'status': 'success', 'message': '通知已发送'}, ensure_ascii=False)
+            self.wfile.write(response.encode('utf-8'))
+            logger.success(f"通知发送成功: {title} - {message}")
+
+        except json.JSONDecodeError:
+            self.send_error(400, "无效的 JSON 格式")
+        except Exception as e:
+            logger.error(f"POST 请求处理失败: {e}")
+            self.send_error(500, f"服务器内部错误: {e}")
+            provider = self.server.plugin.notification_provider
+            provider.push(
+                level="WARNING",
+                title="HTTP API 警告",
+                message=e
+            )
 
     def log_message(self, format, *args):
         logger.debug(f"{self.address_string()} - {format % args}")
@@ -73,7 +141,7 @@ class CustomTCPServer(socketserver.TCPServer):
 class Plugin(CW2Plugin):
     pid = "http.lyang1273"
     name = "HTTP API Plugin"
-    version = "1.0.0"
+    version = "0.1.0"
 
     def __init__(self, api: PluginAPI):
         super().__init__(api)
@@ -81,7 +149,29 @@ class Plugin(CW2Plugin):
         self.httpd = None
         self.server_thread = None
         self.config = {}
+        self.notification_provider = None
         self._load_config()
+
+    def on_load(self):
+        super().on_load()
+        logger.info(f"{self.name} v{self.version} 加载中")
+
+        try:
+            self.notification_provider = self.api.notification.get_provider(
+                provider_id=f"{self.pid}.notification",
+                name=self.name,
+                icon=None
+            )
+            logger.info("通知提供者注册成功")
+        except Exception as e:
+            logger.error(f"注册通知提供者失败: {e}")
+            self.notification_provider = None
+
+        self._load_config()
+
+        self.server_thread = threading.Thread(target=self.start_http_server, daemon=True)
+        self.server_thread.start()
+        logger.info("HTTP 服务器线程启动")
 
     def _load_config(self):
         try:
@@ -133,15 +223,6 @@ class Plugin(CW2Plugin):
             logger.error(f"端口号 {port} 被占用：{e}")
         except Exception as e:
             logger.error(f"HTTP 服务器启动失败：{e}")
-
-    def on_load(self):
-        super().on_load()
-        logger.info(f"{self.name} v{self.version} 请稍后")
-        self._load_config()
-
-        self.server_thread = threading.Thread(target=self.start_http_server, daemon=True)
-        self.server_thread.start()
-        logger.info("HTTP 服务器线程启动")
 
     def on_unload(self):
         logger.info(f"{self.name} 卸载中")
