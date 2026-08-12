@@ -4,6 +4,10 @@ import shutil
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 from Cython.Build import cythonize
 from setuptools import Extension, setup
 

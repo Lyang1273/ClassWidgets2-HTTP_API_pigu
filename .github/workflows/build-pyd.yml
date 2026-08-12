@@ -34,6 +34,8 @@ jobs:
           python -m pip install Cython setuptools wheel
 
       - name: Compile .py -> .pyd
+        env:
+          PYTHONIOENCODING: utf-8
         run: python build_pyd.py
 
       - name: Smoke test import
