@@ -39,6 +39,7 @@ jobs:
         run: python build_pyd.py
 
       - name: Package plugin
+        id: package
         shell: pwsh
         run: |
           $pyVer = "${{ matrix.python }}" -replace '\.', ''
@@ -52,12 +53,13 @@ jobs:
           $zip = Join-Path $root "http-api-cp$pyVer-win_amd64.zip"
           Compress-Archive -Force -Path (Join-Path $pkg "*") -DestinationPath $zip
           Get-ChildItem $zip
+          Write-Output "zip=$zip" >> $env:GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: http-api-cp${{ matrix.python }}-win_amd64
-          path: http-api-cp${{ matrix.python }}-win_amd64.zip
+          path: ${{ steps.package.outputs.zip }}
 
   release:
     name: Release (draft)
