@@ -1,5 +1,6 @@
 """使用 Cython 将 http_api_plugin 包内所有 .py 就地编译为 .pyd，并清理源文件。"""
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from Cython.Build import cythonize
 from setuptools import Extension, setup
 
 ROOT = Path(__file__).resolve().parent
+os.chdir(ROOT)
 PKG = ROOT / "http_api_plugin"
 BUILD_DIR = ROOT / "build" / "pyd"
 
@@ -43,7 +45,9 @@ def main() -> None:
         print("未找到需要编译的 .py 文件", file=sys.stderr)
         raise SystemExit(1)
 
-    extensions = [Extension(name, [str(path)]) for name, path in modules]
+    extensions = [
+        Extension(name, [str(path.relative_to(ROOT))]) for name, path in modules
+    ]
     print(f"待编译模块: {len(extensions)}")
     for name, _ in modules:
         print(f"  - {name}")
