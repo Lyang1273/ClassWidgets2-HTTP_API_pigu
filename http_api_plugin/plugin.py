@@ -27,6 +27,7 @@ class Plugin(CW2Plugin):
 
     def on_load(self):
         super().on_load()
+        logger.info(f"工作目录：{os.getcwd()}")
         logger.info(f"{self.name} v{self.version} 加载中")
 
         try:

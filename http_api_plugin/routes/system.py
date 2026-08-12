@@ -69,11 +69,13 @@ def handle_open_website(ctx, query, body):
     webbrowser.open(link)
     logger.success(f"GET /system/open_website 请求成功: {link}")
     return 200, {'status': 'success', 'message': 'True'}
-    
 
 
 register("/system/is_admin", "GET")(handle_is_admin)
 register("/system/window_title", "GET")(handle_window_title)
 register("/system/lock_screen", "GET")(handle_lock_screen)
 register("/system/open_website", "GET")(handle_open_website)
+register("/system/system_name", "GET")(handle_system_name)
+register("/system/system_version", "GET")(handle_system_version)
+register("/system/system_release", "GET")(handle_system_release)
 # register("/system/screenshot", "GET")(handle_screenshot)
