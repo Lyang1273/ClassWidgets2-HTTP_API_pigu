@@ -2,6 +2,22 @@ from loguru import logger
 import ctypes
 import webbrowser
 from . import register
+import platform
+
+
+def handle_system_name(ctx, query, body):
+    logger.success("GET /system/system_name 请求成功")
+    return 200, {'status': 'success', 'message': platform.system()}
+
+
+def handle_system_version(ctx, query, body):
+    logger.success("GET /system/system_version 请求成功")
+    return 200, {'status': 'success', 'message': platform.version()}
+
+
+def handle_system_release(ctx, query, body):
+    logger.success("GET /system/system_release 请求成功")
+    return 200, {'status': 'success', 'message': platform.release()}
 
 
 def handle_is_admin(ctx, query, body):
