@@ -6,7 +6,10 @@ from .routes import resolve
 
 
 class CustomHandler(BaseHTTPRequestHandler):
+    timeout = 15
+
     def do_GET(self):
+        logger.info("收到GET请求")
         try:
             parsed = urlparse(self.path)
             path = parsed.path
@@ -20,9 +23,11 @@ class CustomHandler(BaseHTTPRequestHandler):
             code, payload = handler(self.server.ctx, query, None)
             self._send_json(code, payload)
             logger.success(f"GET {path} 请求成功")
+        except ConnectionError as e:
+            logger.debug(f"GET 请求连接中断: {e}")
         except Exception as e:
             logger.error(f"GET 请求失败: {e}")
-            self._send_json_error(500, "内部服务器错误")
+            self._safe_send_json_error(500, "内部服务器错误")
 
     def do_POST(self):
         try:
@@ -42,25 +47,35 @@ class CustomHandler(BaseHTTPRequestHandler):
             logger.success(f"POST {path} 请求成功")
         except json.JSONDecodeError:
             self._send_json_error(400, "无效的 JSON 格式")
+        except ConnectionError as e:
+            logger.debug(f"POST 请求连接中断: {e}")
         except Exception as e:
             logger.error(f"POST 请求失败: {e}")
-            self._send_json_error(500, "内部服务器错误")
+            self._safe_send_json_error(500, "内部服务器错误")
 
     def _send_json(self, code, payload):
+        body = json.dumps(payload, indent=2, ensure_ascii=False, default=str).encode('utf-8')
         self.send_response(code)
         self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        body = json.dumps(payload, indent=2, ensure_ascii=False, default=str).encode('utf-8')
         self.wfile.write(body)
 
     def _send_json_error(self, code, message):
+        error_body = json.dumps({'error': message}, ensure_ascii=False).encode('utf-8')
         self.send_response(code)
         self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(error_body)))
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        error_body = json.dumps({'error': message}, ensure_ascii=False)
-        self.wfile.write(error_body.encode('utf-8'))
+        self.wfile.write(error_body)
+
+    def _safe_send_json_error(self, code, message):
+        try:
+            self._send_json_error(code, message)
+        except ConnectionError:
+            pass
 
     def do_OPTIONS(self):
         self.send_response(200)
