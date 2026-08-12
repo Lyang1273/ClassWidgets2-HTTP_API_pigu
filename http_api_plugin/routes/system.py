@@ -1,5 +1,6 @@
 from loguru import logger
 import ctypes
+import webbrowser
 from . import register
 
 
@@ -44,7 +45,19 @@ def handle_screenshot(ctx, query, body):
 """
 
 
+def handle_open_website(ctx, query, body):
+    link = query.get('link', '')
+    if not link:
+        return 400, {'status': 'error', 'message': '缺少 link 参数'}
+
+    webbrowser.open(link)
+    logger.success(f"GET /system/open_website 请求成功: {link}")
+    return 200, {'status': 'success', 'message': 'True'}
+    
+
+
 register("/system/is_admin", "GET")(handle_is_admin)
 register("/system/window_title", "GET")(handle_window_title)
 register("/system/lock_screen", "GET")(handle_lock_screen)
+register("/system/open_website", "GET")(handle_open_website)
 # register("/system/screenshot", "GET")(handle_screenshot)
