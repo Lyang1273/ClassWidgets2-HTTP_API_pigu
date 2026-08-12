@@ -3,17 +3,17 @@
  <h1>HTTP API</h1>
 </div>
 
- ## 介绍 / Introduction
+ ## 介绍
 
  通过HTTP请求获取西大不丢的运行时数据
 
- ## Getting Started / 开始使用
+ ## 开始使用
 
  1.安装插件
 
  2.浏览器访问 [你的ip地址]:8080（如192.168.1.5:8080）
 
- ## Settings / 设置
+ ## 设置
  插件配置文件位于插件目录中（config.json）
  ```
 {
@@ -39,13 +39,13 @@
 }
  ```
 
-## 致谢 / Acknowledgements
+## 致谢
 
 - https://github.com/rinlit-233-shiroko/class-widgets-2
 - https://github.com/Class-Widgets/class-widgets-sdk
 - https://github.com/Delgan/loguru
 
-## 版权 / License
+## 版权
 
 本项目基于 MIT 协议开源，详情请参阅 LICENSE 文件。
 The project is licensed under the MIT license. Please refer to the LICENSE file for details.
