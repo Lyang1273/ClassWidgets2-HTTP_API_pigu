@@ -17,7 +17,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             path = parsed.path
 
-            if path == "/runtime":
+            if path == "/cwsdk/runtime":
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -52,7 +52,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 logger.success("GET /runtime 请求成功")
                 return
 
-            if path in ("/notification", "/notifi"):
+            if path in ("/cwsdk/notification", "/cwsdk/notifi"):
                 # 从查询参数获取数据（GET 兼容）
                 query = dict(parse_qs(parsed.query))
                 # 解析参数（注意 parse_qs 返回列表，取最后一个值）
@@ -66,7 +66,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 # 调用统一发送函数
                 self._send_notification(data)
                 return
-
+            """
             if path == "/system" and __SYSTEM_COMMAND__:
                 # 获取命令
                 query = dict(parse_qs(parsed.query))
@@ -106,6 +106,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(output.encode('utf-8'))
                 logger.info(f"执行命令: {full_command}")
                 return
+            """
 
             self._send_json_error(404, "Not Found")
 
@@ -116,7 +117,7 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             path = self.path
-            if path not in ("/notification", "/notifi"):
+            if path not in ("/cwsdk/notification", "/cwsdk/notifi"):
                 self._send_json_error(404, "Not Found")
                 return
 
