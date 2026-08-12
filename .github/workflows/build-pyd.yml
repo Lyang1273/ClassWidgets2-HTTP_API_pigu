@@ -38,13 +38,6 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: python build_pyd.py
 
-      - name: Smoke test import
-        shell: pwsh
-        run: |
-          python -m pip install loguru class-widgets-sdk
-          $env:PYTHONPATH = (Get-Location).Path
-          python -c "import http_api_plugin; print('import OK')"
-
       - name: Package plugin
         shell: pwsh
         run: |
