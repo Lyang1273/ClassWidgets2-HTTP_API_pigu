@@ -1,6 +1,6 @@
 from ClassWidgets.SDK import NotificationLevel
 from loguru import logger
-
+from ..response import success, error
 from . import register
 
 
@@ -35,7 +35,7 @@ def handle_notification(ctx, query, body):
     closable = bool(data.get('closable', True))
 
     if ctx.notification_provider is None:
-        return 500, {'error': '通知提供者未注册'}
+        return error(500, "通知提供者未注册")
 
     ctx.notification_provider.push(
         level=level,
@@ -45,7 +45,7 @@ def handle_notification(ctx, query, body):
         closable=closable
     )
     logger.success(f"通知发送成功: {title} - {message}")
-    return 200, {'status': 'success', 'message': '通知已发送'}
+    return success(message="通知已发送")
 
 
 register("/cwsdk/notification", "GET")(handle_notification)

@@ -1,32 +1,29 @@
 from loguru import logger
 import ctypes
 import webbrowser
+from ..response import success, error
 from . import register
 import platform
 
 
 def handle_system_name(ctx, query, body):
     logger.success("GET /system/system_name 请求成功")
-    return 200, {'status': 'success', 'message': platform.system()}
+    return success(platform.system())
 
 
 def handle_system_version(ctx, query, body):
     logger.success("GET /system/system_version 请求成功")
-    return 200, {'status': 'success', 'message': platform.version()}
+    return success(platform.version())
 
 
 def handle_system_release(ctx, query, body):
     logger.success("GET /system/system_release 请求成功")
-    return 200, {'status': 'success', 'message': platform.release()}
+    return success(platform.release())
 
 
 def handle_is_admin(ctx, query, body):
-    if ctypes.windll.shell32.IsUserAnAdmin():
-        logger.success("GET /system/is_admin 请求成功")
-        return 200, {'status': 'success', 'message': 'True'}
-    else:
-        logger.success("GET /system/is_admin 请求成功")
-        return 200, {'status': 'success', 'message': 'False'}
+    logger.success("GET /system/is_admin 请求成功")
+    return success('True' if ctypes.windll.shell32.IsUserAnAdmin() else 'False')
 
 
 def handle_window_title(ctx, query, body):
@@ -36,16 +33,12 @@ def handle_window_title(ctx, query, body):
     title = title.value
 
     logger.success("GET /system/window_title 请求成功")
-    return 200, {'status': 'success', 'message': title}
+    return success(title)
 
 
 def handle_lock_screen(ctx, query, body):
-    if ctypes.windll.user32.LockWorkStation():
-        logger.success("GET /system/lock_screen 请求成功")
-        return 200, {'status': 'success', 'message': "True"}
-    else:
-        logger.success("GET /system/lock_screen 请求成功")
-        return 200, {'status': 'success', 'message': "False"}
+    logger.success("GET /system/lock_screen 请求成功")
+    return success('True' if ctypes.windll.user32.LockWorkStation() else 'False')
 
 
 """
@@ -57,18 +50,18 @@ def handle_screenshot(ctx, query, body):
     image_bytes = buffer.getvalue()
 
     base64_str = base64.b64encode(image_bytes).decode('utf-8')
-    return 200, {'status': 'success', 'message': base64_str}
+    return success(base64_str)
 """
 
 
 def handle_open_website(ctx, query, body):
     link = query.get('link', '')
     if not link:
-        return 400, {'status': 'error', 'message': '缺少 link 参数'}
+        return error(400, "缺少 link 参数")
 
     webbrowser.open(link)
     logger.success(f"GET /system/open_website 请求成功: {link}")
-    return 200, {'status': 'success', 'message': 'True'}
+    return success('True')
 
 
 register("/system/is_admin", "GET")(handle_is_admin)

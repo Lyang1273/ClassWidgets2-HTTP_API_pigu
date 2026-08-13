@@ -1,11 +1,13 @@
 from loguru import logger
+from ..response import success
 from . import register
+import json
 
 
-def handle_cw(ctx, query, body):
-    logger.success("GET /cw 请求成功")
-    config = open("./configs/configs.json", "r", encoding="utf-8")
-    return 200, {'status': 'success', 'message': config}
+def handle_cw_ver(ctx, query, body):
+    with open("./configs/configs.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+    return success(config["app"]["version"])
 
 
-register("/cw", "GET")(handle_cw)
+register("/cw/cw_ver", "GET")(handle_cw_ver)

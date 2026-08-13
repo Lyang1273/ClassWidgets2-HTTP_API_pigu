@@ -63,7 +63,7 @@ class CustomHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_json_error(self, code, message):
-        error_body = json.dumps({'error': message}, ensure_ascii=False).encode('utf-8')
+        error_body = json.dumps({'code': code, 'message': message, 'data': None}, ensure_ascii=False).encode('utf-8')
         self.send_response(code)
         self.send_header('Content-type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(error_body)))

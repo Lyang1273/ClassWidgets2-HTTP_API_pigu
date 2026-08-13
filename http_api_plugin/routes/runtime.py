@@ -1,5 +1,6 @@
 from loguru import logger
 
+from ..response import success
 from . import register
 
 
@@ -28,7 +29,7 @@ def handle_runtime(ctx, query, body):
             response_data[key] = default
 
     logger.success("GET /runtime 请求成功")
-    return 200, response_data
+    return success(response_data)
 
 
 register("/cwsdk/runtime", "GET")(handle_runtime)
