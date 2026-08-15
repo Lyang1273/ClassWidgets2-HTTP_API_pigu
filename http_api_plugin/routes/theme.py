@@ -7,4 +7,4 @@ def handle_current(ctx, query, body):
     return success(theme)
 
 
-register("/cwsdk/app/info", "GET")(handle_current)
+register("/cwsdk/theme/current", "GET")(handle_current)
