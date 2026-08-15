@@ -15,4 +15,4 @@ def resolve(path, method):
     return ROUTES.get((path, method))
 
 
-from . import notification, runtime, schedule, system, cw
+from . import notification, runtime, schedule, system, cw, app, theme
