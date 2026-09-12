@@ -12,7 +12,7 @@ from .server import ServerLifecycle
 class Plugin(CW2Plugin):
     pid = "http.lyang1273"
     name = "HTTP API Plugin"
-    version = "0.2.0"
+    version = "0.3.1"
 
     def __init__(self, api: PluginAPI):
         super().__init__(api)

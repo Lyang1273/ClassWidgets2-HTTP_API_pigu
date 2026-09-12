@@ -1,7 +1,7 @@
 {
   "id": "http.lyang1273",
   "name": "HTTP API",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "api_version": ">=0.5.0",
   "entry": "main.py",
   "author": "Lyang1273",
