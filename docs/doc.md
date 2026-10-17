@@ -1,7 +1,7 @@
 # HTTP API 参考文档
 
 > [!NOTE]
-> 本文档由 AI 生成（生成日期：2026-08-15），内容基于源码整理，可能存在偏差，请以实际代码行为准。
+> 本文档由 AI 生成（生成日期：2026-10-17），内容基于源码整理，可能存在偏差，请以实际代码行为准。
 
 通过 HTTP 请求使用 Class Widgets 2 的 SDK 能力。所有响应均为 JSON（`Content-Type: application/json; charset=utf-8`），并带 `Access-Control-Allow-Origin: *`（支持浏览器跨域调用）。
 
@@ -231,3 +231,110 @@ curl -X POST http://localhost:8080/cwsdk/notification \
 | `code` | 要执行的 Python 代码（必填） |
 
 响应：`{ "code": 0, "message": "success", "data": 0 | 1 }`
+
+## 插件集成接口 `http_api_mod`
+
+> [!NOTE]
+> 有关`http_api_mod`的使用教程，请参见[此处](/docs/使用插件集成api接口.md)
+
+本插件在加载时会向 `sys.modules` 注入一个名为 `http_api_mod` 的虚拟模块，供**其他 Class Widgets 插件**在运行期注册自己的 HTTP 路由。其他插件通过 `import http_api_mod` 即可使用，无需依赖本插件的包路径。
+
+> [!NOTE]
+> 该模块仅在本插件启用期间存在；本插件卸载时会从 `sys.modules` 中移除，并清空全部外部注册的路由。
+
+### `http_api_mod.add_root(root_path)`
+
+注册一个根路径，返回一个 `RootRegistry` 对象用于管理其子路由。
+
+| 参数 | 说明 |
+| --- | --- |
+| `root_path` | 根路径，如 `/myplugin`。会自动补全前导 `/` 并去掉结尾 `/` |
+
+- 根路径不能为 `/`，否则抛出 `InvalidPathError`。
+- 根路径命中保留前缀时抛出 `ReservedPrefixError`。
+- 根路径已被占用时抛出 `RootConflictError`。
+
+### `RootRegistry.register(sub_path, handler, methods=None)`
+
+在根路径下注册子路由。
+
+| 参数 | 说明 |
+| --- | --- |
+| `sub_path` | 子路径，如 `/status`；传 `/` 表示根路径本身 |
+| `handler` | 处理函数，签名见下 |
+| `methods` | 可选。`None`（默认）表示**不限定 HTTP 方法**；传字符串或字符串列表（如 `["GET", "POST"]`）则为每个方法分别注册同一个 handler |
+
+- 完整路径与已有方法冲突时抛出 `RouteConflictError`。
+- 完整路径命中保留前缀时抛出 `ReservedPrefixError`。
+- 返回注册的完整路径字符串。
+
+### `RootRegistry.unregister(sub_path, methods=None)`
+
+取消注册。`methods` 为 `None` 时移除该路径下的全部方法（含通配）；否则仅移除指定方法。
+
+### `RootRegistry.destroy()`
+
+清空该根路径下注册的所有路由，并从根路径表中移除该根。
+
+### 处理函数签名与返回值
+
+```python
+def handler(ctx, query, body):
+    ...
+```
+
+| 参数 | 说明 |
+| --- | --- |
+| `ctx` | 运行期上下文对象，见下 |
+| `query` | GET 请求的查询参数字典（POST 时为 `{}`） |
+| `body` | POST 请求解析后的 JSON（GET 时为 `None`） |
+
+返回值支持三种形式：
+
+| 返回 | 效果 |
+| --- | --- |
+| `None` | 返回 `200`，`{ "code": 0, "message": "ok", "data": null }` |
+| `(http_code, payload)` | 以 `http_code` 作为 HTTP 状态码，`payload` 作为 JSON 体 |
+| 其他（如 `dict`） | 返回 `200`，直接把返回值作为 JSON 体 |
+
+推荐使用 `http_api_mod.success(data, message)` 与 `http_api_mod.error(code, message)` 构造返回值（等价于 `response.py` 中的 `success`/`error`，均返回 `(http_code, payload)` 元组）。
+
+### `ctx` 可用属性
+
+| 属性 | 说明 |
+| --- | --- |
+| `ctx.plugin` | HTTP API 插件实例 |
+| `ctx.api` | Class Widgets SDK 的 `PluginAPI` 对象 |
+| `ctx.notification_provider` | 本插件注册的通知提供者，可能为 `None` |
+| `ctx.config` | 本插件配置对象（`port` / `fields`） |
+
+### 保留前缀
+
+其他插件不得注册以下前缀（及其子路径），否则抛出 `ReservedPrefixError`：
+
+`/cwsdk`、`/system`、`/internal`、`/cw`、`/debug`、`/embedded`
+
+### 异常类
+
+`http_api_mod` 暴露以下异常类，均继承自 `RegistryError`：`RegistryError`、`ReservedPrefixError`、`RootConflictError`、`RouteConflictError`、`InvalidPathError`。
+
+### 示例
+
+```python
+import http_api_mod
+
+root = http_api_mod.add_root("/myplugin")
+
+
+def hello(ctx, query, body):
+    return http_api_mod.success({"hello": "world"})
+
+
+root.register("/hello", hello, methods=["GET"])
+```
+
+注册后即可通过 `GET /myplugin/hello` 访问。
+
+### 接口版本
+
+虚拟模块暴露 `http_api_mod.__version__`（等于本插件版本号），可用于兼容性判断。

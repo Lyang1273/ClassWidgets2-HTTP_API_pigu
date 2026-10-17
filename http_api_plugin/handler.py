@@ -2,7 +2,8 @@ import json
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from loguru import logger
-from .routes import resolve
+from .routes import resolve, registry
+from .response import success
 
 
 class CustomHandler(BaseHTTPRequestHandler):
@@ -15,13 +16,13 @@ class CustomHandler(BaseHTTPRequestHandler):
             path = parsed.path
             query = {key: values[-1] for key, values in parse_qs(parsed.query).items()}
 
-            handler = resolve(path, "GET")
+            handler, is_external = self._resolve(path, "GET")
             if handler is None:
                 self._send_json_error(404, "Not Found")
                 return
 
-            code, payload = handler(self.server.ctx, query, None)
-            self._send_json(code, payload)
+            result = self._call_handler(handler, path, query, None, is_external)
+            self._send_result(result)
             logger.success(f"GET {path} 请求成功")
         except ConnectionError as e:
             logger.debug(f"GET 请求连接中断: {e}")
@@ -33,7 +34,7 @@ class CustomHandler(BaseHTTPRequestHandler):
         try:
             path = urlparse(self.path).path
 
-            handler = resolve(path, "POST")
+            handler, is_external = self._resolve(path, "POST")
             if handler is None:
                 self._send_json_error(404, "Not Found")
                 return
@@ -42,8 +43,8 @@ class CustomHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
 
-            code, payload = handler(self.server.ctx, {}, data)
-            self._send_json(code, payload)
+            result = self._call_handler(handler, path, {}, data, is_external)
+            self._send_result(result)
             logger.success(f"POST {path} 请求成功")
         except json.JSONDecodeError:
             self._send_json_error(400, "无效的 JSON 格式")
@@ -52,6 +53,29 @@ class CustomHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error(f"POST 请求失败: {e}")
             self._safe_send_json_error(500, "内部服务器错误")
+
+    def _resolve(self, path, method):
+        handler = resolve(path, method)
+        if handler is not None:
+            return handler, False
+        return registry.get_handler(path, method), True
+
+    def _call_handler(self, handler, path, query, body, is_external):
+        try:
+            return handler(self.server.ctx, query, body)
+        except Exception as e:
+            if is_external:
+                logger.error(f"外部插件处理 {path} 失败: {e}")
+            raise
+
+    def _send_result(self, result):
+        if result is None:
+            self._send_json(200, {"code": 0, "message": "ok", "data": None})
+        elif isinstance(result, tuple) and len(result) == 2:
+            code, payload = result
+            self._send_json(int(code), payload)
+        else:
+            self._send_json(200, result)
 
     def _send_json(self, code, payload):
         body = json.dumps(payload, indent=2, ensure_ascii=False, default=str).encode('utf-8')

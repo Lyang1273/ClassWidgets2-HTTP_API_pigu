@@ -1,4 +1,6 @@
 # 路由注册表
+from . import registry
+from .registry import add_root
 
 ROUTES = {}
 
