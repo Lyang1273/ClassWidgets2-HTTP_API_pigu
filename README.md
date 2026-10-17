@@ -1,7 +1,9 @@
 <div align="center">
- <img src="icon.png" alt="插件图标" width="18%">
+ <img src="icon.png" alt="HTTP API 插件徽标" width="18%">
  <h1>HTTP API</h1>
 </div>
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Lyang1273/ClassWidgets2-HTTP_API_pigu)
 
 > [!NOTE]
 > 本文档由 AI 生成（生成日期：2026-08-15），内容基于源码整理，可能存在偏差，请以实际代码行为为准。
