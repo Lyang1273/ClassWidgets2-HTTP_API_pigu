@@ -2,7 +2,7 @@
   "id": "http.lyang1273",
   "name": "HTTP API",
   "version": "0.5.0",
-  "api_version": ">=0.5.0",
+  "api_version": ">=0.6.0",
   "entry": "main.py",
   "author": "Lyang1273",
   "description": "为 Class Widgets 提供API接口，同时也为其他插件提供接口。",
