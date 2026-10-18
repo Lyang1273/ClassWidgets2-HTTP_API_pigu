@@ -30,6 +30,8 @@
 
 - `port`：HTTP 服务器监听端口（默认 `8080`）。
 
+也可在 Class Widgets 2 的「设置 → 插件」中打开本插件的设置页面，直接修改端口并重启服务器，无需手动编辑 `config.json`。
+
 ## 致谢
 
 - https://github.com/rinlit-233-shiroko/class-widgets-2

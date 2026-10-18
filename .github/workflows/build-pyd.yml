@@ -48,6 +48,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
           Copy-Item -Force -Path "main.py", "cwplugin.json", "icon.png", "README.md", "pyproject.toml" -Destination $pkg
           Copy-Item -Recurse -Force -Path "http_api_plugin" -Destination $pkg
+          if (Test-Path "assets") { Copy-Item -Recurse -Force -Path "assets" -Destination $pkg }
           if (Test-Path "docs") { Copy-Item -Recurse -Force -Path "docs" -Destination $pkg }
 
           $zip = Join-Path $root "http-api-cp$pyVer-win_amd64.zip"

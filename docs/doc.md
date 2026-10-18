@@ -1,7 +1,7 @@
 # HTTP API 参考文档
 
 > [!NOTE]
-> 本文档由 AI 生成（生成日期：2026-10-17），内容基于源码整理，可能存在偏差，请以实际代码行为准。
+> 适用版本 0.6.0 (Lake Tekapo)
 
 通过 HTTP 请求使用 Class Widgets 2 的 SDK 能力。所有响应均为 JSON（`Content-Type: application/json; charset=utf-8`），并带 `Access-Control-Allow-Origin: *`（支持浏览器跨域调用）。
 
@@ -29,6 +29,10 @@
 ```
 
 - `port`：HTTP 服务器监听端口
+
+### 设置界面
+
+插件在 Class Widgets 2 的「设置 → 插件」中提供图形化设置页面（`assets/settings.qml`），可查看服务器运行状态、修改监听端口并保存重启，以及一键在浏览器中打开面板。修改端口后插件会自动重启 HTTP 服务器；若端口非法或被占用会给出提示。
 
 ## `/cwsdk`
 
