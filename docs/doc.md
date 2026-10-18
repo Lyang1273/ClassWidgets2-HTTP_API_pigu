@@ -24,28 +24,11 @@
 
 ```json
 {
-  "port": 8080,
-  "fields": {
-    "current_time": true,
-    "current_day_of_week": true,
-    "current_week": true,
-    "current_week_of_cycle": true,
-    "time_offset": true,
-    "schedule_meta": true,
-    "current_day_entries": true,
-    "current_entry": true,
-    "current_subject": true,
-    "current_title": true,
-    "next_entries": true,
-    "current_status": true,
-    "progress": true,
-    "remaining_time": true
-  }
+  "port": 8080
 }
 ```
 
 - `port`：HTTP 服务器监听端口
-- `fields`：`/cwsdk/runtime` 返回字段的开关，`false` 表示不在响应中返回该字段
 
 ## `/cwsdk`
 
@@ -53,7 +36,7 @@ Class Widgets SDK 相关接口。
 
 ### GET `/cwsdk/runtime`
 
-返回 ClassWidgets 的运行时数据，返回字段由 `config.json` 的 `fields` 控制。
+返回 ClassWidgets 的运行时数据。
 
 字段说明（详细类型参考：https://github.com/RinLit-233-shiroko/Class-Widgets-2/blob/main/docs/dev/plugin/api_reference.md#4-runtimeapi---%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BF%A1%E6%81%AF）：
 
@@ -377,7 +360,7 @@ def handler(ctx, query, body):
 | `ctx.plugin` | HTTP API 插件实例 |
 | `ctx.api` | Class Widgets SDK 的 `PluginAPI` 对象 |
 | `ctx.notification_provider` | 本插件注册的通知提供者，可能为 `None` |
-| `ctx.config` | 本插件配置对象（`port` / `fields`） |
+| `ctx.config` | 本插件配置对象（`port`） |
 
 ### 保留前缀
 

@@ -24,30 +24,11 @@
 
 ```json
 {
-  "port": 8080,
-  "fields": {
-    "current_time": true,
-    "current_day_of_week": true,
-    "current_week": true,
-    "current_week_of_cycle": true,
-    "time_offset": true,
-    "schedule_meta": true,
-    "current_day_entries": true,
-    "current_entry": true,
-    "current_subject": true,
-    "current_title": true,
-    "next_entries": true,
-    "current_status": true,
-    "progress": true,
-    "remaining_time": true
-  }
+  "port": 8080
 }
 ```
 
 - `port`：HTTP 服务器监听端口（默认 `8080`）。
-- `fields`：`/cwsdk/runtime` 接口返回字段的开关，`false` 表示不在响应中返回该字段。
-
-`fields` 各字段的详细类型与含义，请参阅 [Class Widgets 2 插件 API 参考](https://github.com/RinLit-233-shiroko/Class-Widgets-2/blob/main/docs/dev/plugin/api_reference.md#4-runtimeapi---%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BF%A1%E6%81%AF)。
 
 ## 致谢
 

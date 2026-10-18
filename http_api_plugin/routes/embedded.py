@@ -8,8 +8,7 @@ from . import register
 def handle_runtime(ctx, query, body):
     runtime = ctx.api.runtime
 
-    response_data = {}
-    field_map = {
+    response_data = {
         'current_time': runtime.current_time,
         'current_day_of_week': runtime.current_day_of_week,
         'current_week': runtime.current_week,
@@ -25,9 +24,6 @@ def handle_runtime(ctx, query, body):
         'progress': runtime.progress,
         'remaining_time': runtime.remaining_time,
     }
-    for key, default in field_map.items():
-        if ctx.config.is_field_enabled(key):
-            response_data[key] = default
 
     logger.success("GET /embedded/runtime 请求成功")
     return success(response_data)
