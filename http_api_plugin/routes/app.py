@@ -12,5 +12,7 @@ def handle_info(ctx, query, body):
     return success(info)
 
 
+register("/cwsdk/Application/info", "GET")(handle_info)
+register("/cwsdk/Application/restart", "GET")(handle_restart)
 register("/cwsdk/app/info", "GET")(handle_info)
 register("/cwsdk/app/restart", "GET")(handle_restart)
