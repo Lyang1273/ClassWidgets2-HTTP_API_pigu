@@ -15,5 +15,4 @@ def handle_cw_exit(ctx, query, body):
     os._exit(0)
 
 
-register("/cw/cw_ver", "GET")(handle_cw_ver)
 register("/cw/exit", "GET")(handle_cw_exit)
