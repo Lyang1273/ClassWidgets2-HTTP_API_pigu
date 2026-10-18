@@ -167,6 +167,77 @@ curl -X POST http://localhost:8080/cwsdk/notification \
 
 获取当前主题信息，`data` 为当前主题对象。
 
+### GET/POST `/cwsdk/diagnostics`
+
+读取主程序诊断日志，`data` 为日志列表，每项结构：
+
+| 字段 | 说明 |
+| --- | --- |
+| `time` | 日志时间 |
+| `level` | 日志级别 |
+| `message` | 日志内容 |
+
+**参数：**
+
+| 字段 | 说明 | 默认值 |
+| --- | --- | --- |
+| `limit` | 读取的日志条数，必须为正整数 | `100` |
+
+- GET 通过查询参数传参，POST 通过 JSON body 传参（如 `{"limit": 50}`）。
+- `limit` 非正整数返回 `400`；读取失败返回 `500`。
+
+示例响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    { "time": "2026-08-12 10:00:00", "level": "INFO", "message": "应用启动" }
+  ]
+}
+```
+
+### 全局 Action `/cwsdk/action/*`
+
+与 Class Widgets 2 SDK 的 `ActionsAPI` 对接，用于查询、触发和注册全局 Action（Action 即带参数的 Qt Signal）。以下接口均支持 GET 与 POST。
+
+| 接口 | 参数 | 说明 |
+| --- | --- | --- |
+| `/cwsdk/action/get` | `name` | 查询 Action 是否存在，返回 `{ "name": ..., "exists": true }`；未注册返回 `404` |
+| `/cwsdk/action/emit` | `name`、`args` | 触发 Action，等价于 `ctx.api.actions.get(name).emit(*args)` |
+| `/cwsdk/action/register` | `name`、`params` | 注册 Action，等价于 `ctx.api.actions.register(name, *parameter_types)` |
+
+- `name` 必填，缺失返回 `400`；未找到 Action 返回 `404`；触发/注册失败返回 `500`。
+- `args` 的**个数与类型**必须和注册时的参数一致（例如注册为 `str,int` 就必须传 2 个参数）。
+
+**`args` 的写法（无需 URL 转义）：**
+
+| 写法 | 结果 |
+| --- | --- |
+| `args=dashboard,0` | `emit("dashboard", 0)` |
+| `args=hello` | `emit("hello")` |
+| `args=true,3.14` | `emit(True, 3.14)` |
+| `args=[1,2]` | `emit(1, 2)`（JSON 数组） |
+| `args=["a,b"]` | `emit("a,b")`（字符串含逗号时用此形式） |
+
+- 逗号分隔时会智能转换：`true`/`false` → 布尔值，纯整数 → `int`，纯小数 → `float`，其余为字符串；`null`/`none` → `None`。
+- POST 也可直接传 JSON：`{"name": "...", "args": ["dashboard", 0]}`。
+
+**`params` 的类型名**：`str`/`string`、`int`、`float`、`bool`、`list`、`dict`、`any`；多个类型用逗号分隔（如 `params=str,int`）。
+
+示例：
+
+```
+GET /cwsdk/action/emit?name=com.example.open&args=dashboard,0
+```
+
+```bash
+curl -X POST http://localhost:8080/cwsdk/action/emit \
+  -H "Content-Type: application/json" \
+  -d '{"name":"com.example.open","args":["dashboard",0]}'
+```
+
 ## `/cw`
 
 ### GET `/cw/cw_ver`
