@@ -37,6 +37,7 @@
 - https://github.com/rinlit-233-shiroko/class-widgets-2
 - https://github.com/Class-Widgets/class-widgets-sdk
 - https://github.com/Delgan/loguru
+- https://github.com/UniDesktop/SDK（跨平台桌面能力，用于锁屏）
 
 ## 版权
 

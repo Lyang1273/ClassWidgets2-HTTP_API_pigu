@@ -1,9 +1,12 @@
-from loguru import logger
 import ctypes
-import webbrowser
-from ..response import success, error
-from . import register
 import platform
+import webbrowser
+
+from loguru import logger
+
+from ..response import success, error
+from ..uni_desktop import uda_call
+from . import register
 
 
 def handle_system_name(ctx, query, body):
@@ -22,23 +25,28 @@ def handle_system_release(ctx, query, body):
 
 
 def handle_is_admin(ctx, query, body):
-    logger.success("GET /system/is_admin 请求成功")
-    return success('True' if ctypes.windll.shell32.IsUserAnAdmin() else 'False')
+    if platform.system() != "Windows":
+        return 200, {"code": 1, "message": "当前操作系统不支持该api", "data": None}
+    else:
+        logger.success("GET /system/is_admin 请求成功")
+        return success('True' if ctypes.windll.shell32.IsUserAnAdmin() else 'False')
 
 
 def handle_window_title(ctx, query, body):
-    user32 = ctypes.windll.user32
-    title = ctypes.create_unicode_buffer(256)
-    ctypes.windll.user32.GetWindowTextW(user32.GetForegroundWindow(), title, 256)
-    title = title.value
+    if platform.system() != "Windows":
+        return 200, {"code": 1, "message": "当前操作系统不支持该api", "data": None}
+    else:
+        user32 = ctypes.windll.user32
+        title = ctypes.create_unicode_buffer(256)
+        ctypes.windll.user32.GetWindowTextW(user32.GetForegroundWindow(), title, 256)
+        title = title.value
 
-    logger.success("GET /system/window_title 请求成功")
-    return success(title)
+        logger.success("GET /system/window_title 请求成功")
+        return success(title)
 
 
 def handle_lock_screen(ctx, query, body):
-    logger.success("GET /system/lock_screen 请求成功")
-    return success('True' if ctypes.windll.user32.LockWorkStation() else 'False')
+    return uda_call(lambda u: u.session.lock(), what="锁屏")
 
 
 """
@@ -72,3 +80,6 @@ register("/system/system_name", "GET")(handle_system_name)
 register("/system/system_version", "GET")(handle_system_version)
 register("/system/system_release", "GET")(handle_system_release)
 # register("/system/screenshot", "GET")(handle_screenshot)
+
+"""大烧货留下的高级代码（"""
+"""你妈的怎么给我搬到最后一行了"""

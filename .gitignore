@@ -10,3 +10,7 @@ dist/
 build/
 *.egg-info/
 *.cwplugin
+# 临时排查用的残留文件（Windows 目录权限异常时无法删除）
+_probe_by_fs_tool.py
+_probe_toplevel.py
+_probe_lazy.py

@@ -233,7 +233,7 @@ curl -X POST http://localhost:8080/cwsdk/action/emit \
 
 ## `/system`
 
-系统操作（仅 Windows，依赖 `ctypes`）。
+系统操作。`/system/is_admin`、`/system/window_title` 仅在 Windows 可用；`/system/lock_screen` 跨平台。
 
 ### GET `/system/system_name`
 
@@ -261,9 +261,28 @@ curl -X POST http://localhost:8080/cwsdk/action/emit \
 
 ### GET `/system/lock_screen`
 
-锁定工作站屏幕。
+锁定当前会话（跨平台，底层使用 [UDA](https://github.com/UniDesktop/SDK)）。
 
-响应：`{ "code": 0, "message": "success", "data": "True" | "False" }`
+- Windows：`LockWorkStation()`
+- Linux：`org.freedesktop.ScreenSaver.Lock()`，失败时回退 `loginctl lock-session`
+
+成功响应：`{ "code": 0, "message": "success", "data": "True" }`
+
+动态库缺失、当前桌面环境不支持锁定或后端调用失败时返回 `500`，`message` 中给出具体原因，
+例如 `{ "code": 500, "message": "锁屏失败: ...", "data": null }`。
+
+依赖插件目录 `http_api_plugin/uda/` 下与当前平台、架构匹配的动态库：
+
+| 平台 | 文件名 | 说明 |
+| --- | --- | --- |
+| Windows 10/11 | `uda_ffi.dll` | 自带，无额外运行时依赖 |
+| Linux | `libuda_ffi.so` | x86-64；需要 glibc ≥ 2.39（Ubuntu 24.04+、Fedora 40+、Debian 13+），musl（如 Alpine）不可用 |
+
+库版本与解释器架构不匹配时（例如 32 位 Python 加载 64 位库）会被跳过并回退为 `500`，
+不会影响插件的其他接口。可用环境变量 `UDA_LIBRARY` 指定其他路径的动态库。
+
+接口实现见 `http_api_plugin/uni_desktop.py`：所有 UDA 相关路由都通过它统一加载动态库并
+处理错误，新增接口时只需一行，详见[为插件开发接口](#为插件开发接口)。
 
 ### GET `/system/open_website`
 
@@ -396,3 +415,65 @@ root.register("/hello", hello, methods=["GET"])
 ### 接口版本
 
 虚拟模块暴露 `http_api_mod.__version__`（等于本插件版本号），可用于兼容性判断。
+
+## 为插件开发接口
+
+在本插件内新增使用 UDA（桌面能力）的接口时，不要自己加载动态库：`http_api_plugin/uni_desktop.py`
+已经封装了选库、架构校验、单例加载与错误处理。路由里只需一行：
+
+```python
+from ..response import success
+from ..uni_desktop import uda_call
+
+def handle_theme(ctx, query, body):
+    return uda_call(lambda u: u.theme, what="获取主题")
+
+def handle_lock_screen(ctx, query, body):
+    return uda_call(lambda u: u.session.lock(), what="锁屏")
+```
+
+`uda_call` 的行为：
+
+- 成功：返回 `{ "code": 0, "message": "success", "data": <返回值> }`；回调没有返回值时 `data` 为 `"True"`。
+- UDA 不可用（未找到匹配的库）：返回 `500`，`message` 说明缺少哪个文件。
+- 回调抛异常：返回 `500`，`message` 形如 `锁屏失败: <原因>`。
+
+其它可用的模块级函数：
+
+| 函数 | 用途 |
+| --- | --- |
+| `available()` | UDA 是否可用 |
+| `is_supported(action)` | 当前平台是否支持某个会话动作（`lock` / `suspend` / `reboot` 等），不会抛异常 |
+| `get_uda()` | 直接取 `Uda` 实例，用于需要多次调用的场景 |
+| `release()` | 插件卸载时释放常亮锁与托盘资源 |
+| `unavailable_reason()` | 不可用的具体原因（用于日志或错误信息） |
+
+> [!WARNING]
+> 会话类动作中只有 `lock` 适合直接暴露为接口。`shutdown` / `reboot` / `suspend` / `hibernate` /
+> `logout` 会中断用户会话或关机，若封装为接口必须默认关闭并显式要求确认参数。
+
+### 直接使用 UDA SDK（官方写法）
+
+插件加载时会自动完成两件事：把 `http_api_plugin/uda/` 加入 `sys.path`，并把匹配当前平台的
+动态库写入环境变量 `UDA_LIBRARY`。因此可以**照抄 UDA 官方文档**，无需传 `library_path`：
+
+```python
+from uda import Uda
+
+with Uda() as uda:
+    print("主题:", uda.theme)
+    uda.notify("你好，桌面", "这是通过 UDA 发出的第一条系统通知。")
+```
+
+> [!NOTE]
+> 上述代码的前置条件是**插件已经加载**（`http_api_plugin` 被导入）。独立脚本中直接使用需自行
+> 设置 `UDA_LIBRARY` 或把 `uda/` 加入 `sys.path`。
+
+### 在 Windows 上发通知，请优先用 Class Widgets 的通知
+
+实测：UDA 的 `notify()` 在**普通（非 MSIX 打包）Windows 进程**中会失败，报错
+`UDA error -5: CreateToastNotifierWithId failed: 该进程没有程序包标识符 (0x80073D54)`。
+这是 Windows toast 要求包标识（AUMID）所致，与插件集成无关——不经插件、单独调用也如此。
+
+因此在 Class Widgets 内发通知，请用已有的 `/cwsdk/notification` 接口或
+`ctx.notification_provider`，不要依赖 `uda.notify()`。UDA 的其余能力（如锁屏）不受影响。
