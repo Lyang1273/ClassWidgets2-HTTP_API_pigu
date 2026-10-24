@@ -8,7 +8,7 @@
 
 ## 介绍
 
-通过 HTTP 请求获取西大不丢（Class Widgets 2）的运行时数据，并支持通知发送、课程表管理、系统操作等远程控制能力。所有接口返回 JSON。
+通过 HTTP API 给你的西大不丢（Class Widgets 2）开放一个 API 接口。
 
 详细接口说明请参阅 [docs/doc.md](docs/doc.md)。
 
@@ -37,7 +37,7 @@
 - https://github.com/rinlit-233-shiroko/class-widgets-2
 - https://github.com/Class-Widgets/class-widgets-sdk
 - https://github.com/Delgan/loguru
-- https://github.com/UniDesktop/SDK（跨平台桌面能力，用于锁屏）
+- https://github.com/UniDesktop/SDK
 
 ## 版权
 

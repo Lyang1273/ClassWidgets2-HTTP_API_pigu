@@ -1,7 +1,7 @@
 # HTTP API 参考文档
 
 > [!NOTE]
-> 适用版本 0.6.0 (Lake Tekapo)
+> 适用版本 0.6.0 (Lake Tekapo)、0.7.0 (Lake Waikaremoana)
 
 通过 HTTP 请求使用 Class Widgets 2 的 SDK 能力。所有响应均为 JSON（`Content-Type: application/json; charset=utf-8`），并带 `Access-Control-Allow-Origin: *`（支持浏览器跨域调用）。
 
@@ -293,6 +293,151 @@ curl -X POST http://localhost:8080/cwsdk/action/emit \
 | `link` | 要打开的 URL（必填） |
 
 缺少 `link` 返回 `400`；成功响应 `{ "code": 0, "message": "success", "data": "True" }`。
+
+## `/system/media`
+
+媒体播控，基于 [UDA 媒体播控](https://unidesktop.sr-studio.cn/zh-cn/guides/media/)：
+
+- **Windows**：WinRT SMTC（`GlobalSystemMediaTransportControls`），取持有系统焦点的会话；
+- **Linux**：MPRIS v2 over session D-Bus，在 `org.mpris.MediaPlayer2.*` 中挑选第一个正在播放的播放器。
+
+> [!IMPORTANT]
+> **「没有播放器」不是错误。** 此时 `now_playing` 返回 `data: null`，`status` 返回 `unknown`，
+> 均为 `200`。只有动态库缺失或后端故障才返回 `500`。
+
+### 播放状态取值
+
+| 值 | 含义 |
+| --- | --- |
+| `playing` | 曲目正在推进 |
+| `paused` | 已加载曲目且进度停止 |
+| `stopped` | 未加载内容，或已播放到结尾 |
+| `unknown` | 无会话获得焦点、播放器未发布状态，或值无法解析 |
+
+`unknown` 表示**无法判定**，与「已暂停」是不同状态。把它当作 `paused` 会让 UI 在无播放器时显示错误的播放按钮。
+
+### 可用播控指令
+
+| 指令 | 说明 |
+| --- | --- |
+| `play` | 开始播放 |
+| `pause` | 暂停播放 |
+| `play_pause` / `toggle` | 在播放与暂停之间切换（两个名字等价） |
+| `next` | 下一曲 |
+| `previous` / `prev` | 上一曲 |
+| `stop` | 停止播放 |
+
+### GET `/system/media`
+
+媒体状态的合并快照，供需要实时更新的 UI 一次取全。
+
+> [!NOTE]
+> 元数据是**一次性快照**，尚无变更监听。需要实时刷新的界面请轮询此接口，UDA 建议间隔 ≥ 1 秒。
+
+响应 `data`：
+
+```json
+{
+  "has_session": true,
+  "status": "playing",
+  "now_playing": {
+    "title": "This Love (Taylor's Version)",
+    "artists": ["Taylor Swift"],
+    "artist": "Taylor Swift",
+    "album": "",
+    "duration_ms": 195747,
+    "position_ms": 7134
+  }
+}
+```
+
+无播放器时 `has_session` 为 `false`、`now_playing` 为 `null`。
+
+### GET `/system/media/now_playing`
+
+读取正在播放的曲目元数据。
+
+| 字段 | 说明 |
+| --- | --- |
+| `title` | 曲名；播放器未发布时为空串 |
+| `artists` | 艺人列表；播放器未发布时为空列表 |
+| `artist` | 原始艺人字符串（多位艺人已用 `, ` 连接，保留 UDA 原值） |
+| `album` | 专辑名；电台流等未发布时为空串 |
+| `duration_ms` | 时长（毫秒）；直播流等未知时为 `0` |
+| `position_ms` | 当前播放位置（毫秒）；后端无法上报时为 `0` |
+
+无播放器时返回 `{ "code": 0, "message": "success", "data": null }`。
+
+### GET `/system/media/status`
+
+返回播放状态，`data` 为上文四个状态值之一，如 `{ "code": 0, "message": "success", "data": "playing" }`。
+
+### GET `/system/media/commands`
+
+列出可用指令与状态取值，便于调用方自省，避免硬编码：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "commands": ["next", "pause", "play", "play_pause", "prev", "previous", "stop", "toggle"],
+    "statuses": ["playing", "paused", "stopped", "unknown"]
+  }
+}
+```
+
+### 播控指令接口
+
+每个动作一个独立接口，`GET` 与 `POST` 均可（无参数，`POST` 可不带请求体）：
+
+| 方法 | 路径 |
+| --- | --- |
+| `GET` / `POST` | `/system/media/play` |
+| `GET` / `POST` | `/system/media/pause` |
+| `GET` / `POST` | `/system/media/play_pause` |
+| `GET` / `POST` | `/system/media/next` |
+| `GET` / `POST` | `/system/media/previous` |
+| `GET` / `POST` | `/system/media/stop` |
+
+成功响应：`{ "code": 0, "message": "已发送指令 play", "data": "True" }`。
+
+> [!NOTE]
+> 成功只表示播放器**接受**了指令，之后仍可能失败（UDA 的语义）。
+> 播放器拒绝（如应用未启用 `next`）或没有播放器可接收时返回 `400`，以便调用方区分「已送达」与「被拒绝」：
+> `{ "code": 400, "message": "指令 next 未被接受：...", "data": null }`
+
+```bash
+curl http://localhost:8080/system/media/play
+curl -X POST http://localhost:8080/system/media/next
+```
+
+### `/system/media/send` 与 `/system/media/command`
+
+通用指令接口，按指令名发送。
+
+| 方法 | 路径 | 参数位置 |
+| --- | --- | --- |
+| `GET` / `POST` | `/system/media/send` | 请求体的 `command`（或 `cmd`），也可用查询参数 |
+| `GET` / `POST` | `/system/media/command` | 查询参数 `command`（或 `cmd`），也可用请求体 |
+
+```bash
+curl -X POST http://localhost:8080/system/media/send \
+  -H "Content-Type: application/json" \
+  -d '{"command":"play_pause"}'
+
+curl "http://localhost:8080/system/media/command?command=toggle"
+```
+
+缺少 `command` 或指令名无法识别时返回 `400`，`message` 中列出全部可用指令。
+
+### 错误分层
+
+| 现象 | 返回 |
+| --- | --- |
+| 没有播放器 | `now_playing` 返回 `null`，`status` 返回 `unknown`，均 `200` |
+| 无 D-Bus 会话 / 动态库缺失 | `500`（连接失败 / 无法加载） |
+| 播放器存在但不支持某指令 | `400`，`message` 携带原始失败信息 |
 
 ## `/debug`
 

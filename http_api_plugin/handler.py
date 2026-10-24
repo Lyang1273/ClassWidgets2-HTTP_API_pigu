@@ -41,7 +41,13 @@ class CustomHandler(BaseHTTPRequestHandler):
 
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
+            # 空请求体是合法的：`POST /system/media/play` 这类无参数指令本来就
+            # 不带 body。此时按 None 传给处理器，而不是把空串交给 json.loads
+            # 报「无效的 JSON 格式」。
+            if post_data.strip():
+                data = json.loads(post_data.decode('utf-8'))
+            else:
+                data = None
 
             result = self._call_handler(handler, path, {}, data, is_external)
             self._send_result(result)

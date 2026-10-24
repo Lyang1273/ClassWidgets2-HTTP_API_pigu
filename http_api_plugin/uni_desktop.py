@@ -44,7 +44,10 @@ __all__ = [
     "get_uda",
     "is_supported",
     "release",
+    "status_code",
     "uda_call",
+    "uda_data",
+    "uda_media_command",
     "unavailable_reason",
 ]
 
@@ -267,3 +270,76 @@ def uda_call(func: Callable[[Any], Any], what: str = "UDA 调用"):
 
     logger.success(f"{what}成功")
     return success("True" if result is None else result)
+
+
+# ----------------------------------------------------------------------
+# 状态码与可空读取
+# ----------------------------------------------------------------------
+#: UDA 错误状态码常量；SDK 里也有一份，这里单独写死以免依赖其内部导入顺序。
+_ERR_INVALID_ARGUMENT = -1
+_ERR_NOT_SUPPORTED = -2
+
+
+def status_code(exc: BaseException) -> int | None:
+    """取出 :class:`uda.UdaError` 的状态码；其它异常返回 None。
+
+    UDA 的失败都会带上 C-ABI 状态码，路由层据此区分「调用方参数不对」「没有
+    播放器 / 播放器拒绝」「后端故障」，而不是一律 500。
+    """
+    code = getattr(exc, "status", None)
+    return code if isinstance(code, int) else None
+
+
+def uda_data(func: Callable[[Any], Any], what: str = "UDA 调用"):
+    """读取型接口用：把一次 UDA 调用转成成功响应。
+
+    与 :func:`uda_call` 的区别只在数据形态：这里把返回值原样放进 ``data``，
+    不把 ``None`` 改写成 ``"True"``。「没有值」是合法答案，例如没有播放器时
+    ``data`` 就是 ``null``，而不是一个假的成功标记。
+
+    UDA 不可用时返回 500；调用失败（含后端故障）同样返回 500。
+    """
+    uda = get_uda()
+    if uda is None:
+        return error(500, f"{unavailable_reason()}，{what}接口不可用")
+
+    try:
+        result = func(uda)
+    except Exception as e:  # noqa: BLE001 - 后端错误统一转 500
+        logger.warning(f"{what}失败: {e}")
+        return error(500, f"{what}失败: {e}")
+
+    return success(result)
+
+
+def uda_media_command(command: str):
+    """投递一条播控指令，并区分「已送达」与「被拒绝」。
+
+    ``uda.media.send`` 对下情况都抛 ``UdaError``：没有播放器、或播放器不接受
+    该指令（状态码 ``-2``）。这不算服务端故障，而是当前环境无法执行这条指令，
+    所以映射为 400，让调用方能从状态码直接区分，不必去解析 ``message``。
+
+    成功时只代表播放器**接受**了指令，之后仍可能失败（UDA 文档的语义）。
+    """
+    uda = get_uda()
+    if uda is None:
+        return error(500, f"{unavailable_reason()}，媒体播控接口不可用")
+
+    try:
+        uda.media.send(command)
+    except Exception as e:  # noqa: BLE001 - 按状态码分层，其余仍按 500
+        code = status_code(e)
+        if code == _ERR_NOT_SUPPORTED:
+            logger.info(f"媒体播控指令 {command} 未被接受: {e}")
+            return error(
+                400,
+                f"指令 {command} 未被接受：当前没有可控制的播放器，或播放器不支持该指令（{e}）",
+            )
+        if code == _ERR_INVALID_ARGUMENT:
+            logger.warning(f"媒体播控指令 {command} 不合法: {e}")
+            return error(400, f"指令 {command} 不合法：{e}")
+        logger.warning(f"媒体播控指令 {command} 失败: {e}")
+        return error(500, f"媒体播控指令 {command} 失败: {e}")
+
+    logger.success(f"媒体播控指令 {command} 已发送")
+    return success("True", message=f"已发送指令 {command}")
